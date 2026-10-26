@@ -1,0 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Libre+Caslon+Display&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --color-parchment: #f0e8d8;
+  --color-plum: #55334a;
+  --color-mauve: #b58a9a;
+  --color-gold: #c3a66b;
+  --color-gold-dark: #755d2d;
+  --color-ink: #27232a;
+  --color-card: #faf6ee;
+  --color-login-bg: #55334a;
+  --color-login-text: #faf6ee;
+  --color-login-gold: #dec98f;
+  --font-sans: 'DM Sans', sans-serif;
+  --font-serif: 'Libre Caslon Display', serif;
+}
+
+.dark {
+  --color-parchment: #1d191d;
+  --color-plum: #d0a3bb;
+  --color-mauve: #aa7f94;
+  --color-gold: #c3a66b;
+  --color-gold-dark: #d2b878;
+  --color-ink: #ede4d5;
+  --color-card: #272127;
+  --color-login-bg: #211a20;
+  --color-login-text: #faf6ee;
+  --color-login-gold: #dec98f;
+  color-scheme: dark;
+}
+
+@layer base {
+  body {
+    min-width: 320px;
+    background-color: var(--color-parchment);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    background-image:
+      radial-gradient(rgba(39, 35, 42, 0.045) 0.55px, transparent 0.55px),
+      linear-gradient(rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.15));
+    background-size: 5px 5px, 100% 100%;
+    transition:
+      background-color 250ms ease,
+      color 250ms ease;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(rgba(237, 228, 213, 0.035) 0.55px, transparent 0.55px),
+      linear-gradient(rgba(255, 255, 255, 0.01), rgba(255, 255, 255, 0.01));
+  }
+
+  button,
+  input {
+    border-radius: 0;
+  }
+
+  ::selection {
+    background: var(--color-mauve);
+    color: var(--color-ink);
+  }
+}
+
+@layer components {
+  .label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: var(--color-gold-dark);
+  }
+}
