@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 export type Topic = {
   id: string
   title: string
-  category: string
+  createdBy: string
   count: number
   addedAt: number
   interested: boolean
@@ -13,16 +13,16 @@ export type Topic = {
 type TopicRow = {
   id: string
   title: string
+  created_by: string
   created_at: string
   interest_count: number
   interested: boolean
 }
 
-// The schema has no categories, so every topic gets the label the UI already used for community-added ones.
 const toTopic = (row: TopicRow): Topic => ({
   id: row.id,
   title: row.title,
-  category: 'Community',
+  createdBy: row.created_by,
   count: row.interest_count,
   addedAt: Date.parse(row.created_at),
   interested: row.interested,
@@ -51,7 +51,7 @@ export function useTopics(userId: string | undefined) {
   const reload = useCallback(async () => {
     const { data, error } = await supabase
       .from('topics_with_interest')
-      .select('id, title, created_at, interest_count, interested')
+      .select('id, title, created_by, created_at, interest_count, interested')
       .order('created_at', { ascending: false })
     if (error) return setStatus('error')
     setTopics((data as TopicRow[]).map(toTopic))

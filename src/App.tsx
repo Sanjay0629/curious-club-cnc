@@ -1,13 +1,14 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { ArrowRight, BookOpen, Check, ChevronDown, CircleAlert, RotateCw, Search, X } from 'lucide-react'
 import { TopicCard } from './components/TopicCard'
+import { Journal } from './components/Journal'
 import { LoginPage } from './components/LoginPage'
 import { Notice } from './components/Notice'
 import { ThemeToggle } from './components/ThemeToggle'
 import { addInterest, createTopic, normalizeTitle, useTopics } from './data/topics'
 import { signInWithGoogle, signOut, useSession } from './lib/auth'
 
-type Filter = 'all' | 'wanted' | 'recent'
+type Filter = 'wanted' | 'recent'
 
 const DUPLICATE_MESSAGE = 'That curiosity is already in the collection.'
 
@@ -21,7 +22,7 @@ export default function App() {
   const [newTopic, setNewTopic] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useState<Filter>('wanted')
   const [toast, setToast] = useState<{ text: string; error: boolean } | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -70,18 +71,21 @@ export default function App() {
     .map((part) => part[0].toUpperCase())
     .join('')
 
+  // Topics arrive newest first, so this stable sort breaks vote ties by recency.
+  const ranked = useMemo(() => [...topics].sort((a, b) => b.count - a.count), [topics])
+
   const visibleTopics = useMemo(() => {
-    const matches = topics.filter((topic) =>
-      `${topic.title} ${topic.category}`.toLowerCase().includes(search.toLowerCase()),
-    )
-    if (filter === 'wanted') return [...matches].sort((a, b) => b.count - a.count)
-    if (filter === 'recent') return [...matches].sort((a, b) => b.addedAt - a.addedAt)
-    return matches
-  }, [topics, search, filter])
+    const list = filter === 'wanted' ? ranked : [...topics].sort((a, b) => b.addedAt - a.addedAt)
+    return list.filter((topic) => topic.title.toLowerCase().includes(search.toLowerCase()))
+  }, [ranked, topics, search, filter])
+
+  const userId = session?.user.id
+  const addedByMe = ranked.filter((topic) => topic.createdBy === userId)
+  // Your own topics already carry your vote, so they're listed only under "You want to learn".
+  const votedByMe = ranked.filter((topic) => topic.interested && topic.createdBy !== userId)
 
   const totalInterest = topics.reduce((sum, topic) => sum + topic.count, 0)
   const filters: { id: Filter; label: string }[] = [
-    { id: 'all', label: 'All curiosities' },
     { id: 'wanted', label: 'Most wanted' },
     { id: 'recent', label: 'Recently added' },
   ]
@@ -111,7 +115,7 @@ export default function App() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden">
+    <main className="min-h-screen overflow-x-clip">
       <header className="border-b border-ink/15">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
           <div className="flex items-center gap-4">
@@ -141,7 +145,15 @@ export default function App() {
               </button>
               {menuOpen && (
                 <div className="absolute right-0 top-12 z-20 w-44 border border-ink/15 bg-card p-2 shadow-xl">
-                  <button className="w-full px-3 py-2 text-left text-sm text-ink hover:bg-parchment">My journal</button>
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false)
+                      document.getElementById('journal')?.scrollIntoView({ behavior: 'smooth' })
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm text-ink hover:bg-parchment"
+                  >
+                    My journal
+                  </button>
                   <button
                     onClick={() => {
                       setMenuOpen(false)
@@ -158,17 +170,17 @@ export default function App() {
         </div>
       </header>
 
-      <section className="relative border-b border-ink/15 px-5 py-20 sm:px-8 sm:py-28 lg:px-12">
-        <div className="absolute right-[7%] top-12 hidden font-serif text-[11rem] leading-none text-plum/[0.035] lg:block" aria-hidden="true">?</div>
+      <section className="relative border-b border-ink/15 px-5 py-10 sm:px-8 sm:py-12 lg:px-12">
+        <div className="absolute right-[7%] top-4 hidden font-serif text-[9rem] leading-none text-plum/[0.035] lg:block" aria-hidden="true">?</div>
         <div className="mx-auto max-w-4xl text-center">
-          <p className="label mb-7">Your learning journal</p>
-          <h1 className="text-balance font-serif text-5xl leading-[1.04] tracking-[-0.025em] text-plum sm:text-6xl lg:text-7xl">
+          <p className="label mb-4">Your learning journal</p>
+          <h1 className="text-balance font-serif text-4xl leading-[1.08] tracking-[-0.025em] text-plum sm:text-5xl">
             What have you been wanting to learn?
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-7 text-ink/70 sm:text-lg">
+          <p className="mx-auto mt-3 max-w-2xl text-pretty text-base leading-7 text-ink/70">
             Put your curiosity out into the world. Someone else might be wondering about the very same thing.
           </p>
-          <form onSubmit={addTopic} className="mx-auto mt-10 flex max-w-3xl flex-col gap-3 sm:flex-row">
+          <form onSubmit={addTopic} className="mx-auto mt-6 flex max-w-3xl flex-col gap-3 sm:flex-row">
             <label htmlFor="topic" className="sr-only">A topic you want to learn</label>
             <input
               id="topic"
@@ -186,55 +198,62 @@ export default function App() {
               Add to the list <ArrowRight size={16} aria-hidden="true" />
             </button>
           </form>
-          <p className="mt-4 font-serif text-sm italic text-ink/70">Big ambitions, tiny curiosities — everything belongs here.</p>
+          <p className="mt-3 font-serif text-sm italic text-ink/70">Big ambitions, tiny curiosities — everything belongs here.</p>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-12">
-        <div className="flex flex-col justify-between gap-8 border-b border-ink/15 pb-9 md:flex-row md:items-end">
-          <div>
-            <p className="label mb-4">The community index</p>
-            <h2 className="font-serif text-4xl tracking-tight text-plum sm:text-5xl">A collection of curiosities.</h2>
-            <p className="mt-3 text-ink/70">Things we're all hoping to learn, one idea at a time.</p>
-          </div>
-          <div className="flex gap-8 text-sm">
-            <p><span className="block font-serif text-3xl text-plum">{topics.length}</span><span className="text-ink/70">topics</span></p>
-            <p><span className="block font-serif text-3xl text-plum">{totalInterest.toLocaleString()}</span><span className="text-ink/70">expressions of interest</span></p>
-          </div>
+      <section className="mx-auto grid max-w-7xl gap-8 px-5 py-10 sm:px-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:px-12">
+        {/* Above the list on small screens, a sticky sidebar on large ones. */}
+        <div className="lg:order-last">
+          {status === 'ready' && <Journal added={addedByMe} interested={votedByMe} />}
         </div>
 
-        <div className="flex flex-col justify-between gap-5 py-7 lg:flex-row lg:items-center">
-          <div className="relative w-full lg:max-w-xs">
-            <Search size={16} className="absolute left-0 top-1/2 -translate-y-1/2 text-ink/40" aria-hidden="true" />
-            <label htmlFor="search" className="sr-only">Search curiosities</label>
-            <input id="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search the collection" className="w-full border-b border-ink/25 bg-transparent py-3 pl-7 pr-8 text-sm outline-none placeholder:text-ink/65 focus:border-plum" />
-            {search && <button onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-0 top-1/2 -translate-y-1/2 text-ink/50 hover:text-plum"><X size={15} /></button>}
+        <div>
+          <div className="flex flex-col justify-between gap-5 border-b border-ink/15 pb-5 md:flex-row md:items-end">
+            <div>
+              <p className="label mb-3">The community index</p>
+              <h2 className="font-serif text-3xl tracking-tight text-plum sm:text-4xl">A collection of curiosities.</h2>
+              <p className="mt-2 text-ink/70">Things we're all hoping to learn, one idea at a time.</p>
+            </div>
+            <div className="flex gap-6 text-sm">
+              <p><span className="block font-serif text-2xl text-plum">{topics.length}</span><span className="text-ink/70">topics</span></p>
+              <p><span className="block font-serif text-2xl text-plum">{totalInterest.toLocaleString()}</span><span className="text-ink/70">expressions of interest</span></p>
+            </div>
           </div>
-          <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Sort topics">
-            {filters.map((item) => (
-              <button key={item.id} role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)} className={`whitespace-nowrap border-b px-4 py-3 text-xs font-semibold uppercase tracking-wider transition ${filter === item.id ? 'border-plum text-plum' : 'border-transparent text-ink/65 hover:text-ink'}`}>{item.label}</button>
-            ))}
-          </div>
-        </div>
 
-        {status === 'loading' ? (
-          <Notice title="Gathering curiosities…" />
-        ) : status === 'error' ? (
-          <Notice title="The collection didn't load.">
-            <p>Check your connection and try again.</p>
-            <button type="button" onClick={retry} className="mt-5 inline-flex items-center gap-1.5 border border-plum/35 px-3 py-2 text-xs font-semibold text-plum transition hover:bg-plum hover:text-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum">
-              <RotateCw size={13} strokeWidth={1.8} aria-hidden="true" /> Try again
-            </button>
-          </Notice>
-        ) : visibleTopics.length ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            {visibleTopics.map((topic, index) => <TopicCard key={topic.id} topic={topic} index={index} interested={topic.interested} onInterest={expressInterest} />)}
+          <div className="flex flex-col justify-between gap-4 py-4 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:max-w-xs">
+              <Search size={16} className="absolute left-0 top-1/2 -translate-y-1/2 text-ink/40" aria-hidden="true" />
+              <label htmlFor="search" className="sr-only">Search curiosities</label>
+              <input id="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search the collection" className="w-full border-b border-ink/25 bg-transparent py-3 pl-7 pr-8 text-sm outline-none placeholder:text-ink/65 focus:border-plum" />
+              {search && <button onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-0 top-1/2 -translate-y-1/2 text-ink/50 hover:text-plum"><X size={15} /></button>}
+            </div>
+            <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Sort topics">
+              {filters.map((item) => (
+                <button key={item.id} role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)} className={`whitespace-nowrap border-b px-4 py-3 text-xs font-semibold uppercase tracking-wider transition ${filter === item.id ? 'border-plum text-plum' : 'border-transparent text-ink/65 hover:text-ink'}`}>{item.label}</button>
+              ))}
+            </div>
           </div>
-        ) : (
-          <Notice title="Nothing in the index yet.">
-            {topics.length ? 'Try another phrase, or add this curiosity yourself.' : 'Be the first to add something you want to learn.'}
-          </Notice>
-        )}
+
+          {status === 'loading' ? (
+            <Notice title="Gathering curiosities…" />
+          ) : status === 'error' ? (
+            <Notice title="The collection didn't load.">
+              <p>Check your connection and try again.</p>
+              <button type="button" onClick={retry} className="mt-5 inline-flex items-center gap-1.5 border border-plum/35 px-3 py-2 text-xs font-semibold text-plum transition hover:bg-plum hover:text-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum">
+                <RotateCw size={13} strokeWidth={1.8} aria-hidden="true" /> Try again
+              </button>
+            </Notice>
+          ) : visibleTopics.length ? (
+            <div className="grid gap-2">
+              {visibleTopics.map((topic, index) => <TopicCard key={topic.id} topic={topic} index={index} onInterest={expressInterest} />)}
+            </div>
+          ) : (
+            <Notice title="Nothing in the index yet.">
+              {topics.length ? 'Try another phrase, or add this curiosity yourself.' : 'Be the first to add something you want to learn.'}
+            </Notice>
+          )}
+        </div>
       </section>
 
       <footer className="mx-auto flex max-w-7xl flex-col gap-3 border-t border-ink/15 px-5 py-8 text-xs text-ink/70 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12">
