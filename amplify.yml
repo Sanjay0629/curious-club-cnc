@@ -1,0 +1,17 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - nvm install 22
+        - npm install -g pnpm@10.34.3
+        - pnpm install --frozen-lockfile
+    build:
+      commands:
+        # Vite bakes these in at build time; set them under Hosting > Environment variables.
+        - test -n "$VITE_SUPABASE_URL" && test -n "$VITE_SUPABASE_PUBLISHABLE_KEY" || (echo "Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY in Amplify environment variables" && exit 1)
+        - pnpm run build
+  artifacts:
+    baseDirectory: dist
+    files:
+      - '**/*'
